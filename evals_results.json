@@ -1,0 +1,802 @@
+[
+  {
+    "technique": "Zero-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "opening-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 4,
+      "helpfulness": 5
+    },
+    "average": 4.75,
+    "verdict": "An excellent, role-focused question that thoroughly probes the candidate’s technical and communication abilities, with minor room for improvement in tailoring to candidate responses.",
+    "reply": "You’re owning the A/B test readout for a growth experiment (control vs variant) that ran for two weeks. Walk me through your end-to-end approach:\n\n- What primary and secondary metrics would you include and why?\n- How would you validate randomization and check for bias or data quality issues?\n- What statistical method(s) would you use to determine significance and why? Any adjustments you’d make for multiple comparisons or sequential testing?\n- Outline how you’d implement the data pipeline (dbt models, key transformations/tests) to produce the analysis-ready dataset.\n- Sketch what the Looker dashboard or explores would show and how you’d present the results to non-technical stakeholders.\n\nBe specific (give example SQL snippets or dbt model ideas where helpful). I’ll follow up based on your answer.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly targets key skills from the job posting, including A/B test readouts, SQL/dbt pipeline design, and presenting insights to non-technical stakeholders."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The interviewer asks a detailed, multi-part question that a competent human interviewer would pose to assess both technical and communication skills, with a clear plan to follow up."
+      },
+      "specificity": {
+        "score": 4,
+        "rationale": "The question is highly specific and tailored to the role, but it could be improved by referencing the candidate's actual prior answers once given, rather than only posing a broad scenario."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The question guides the candidate through a comprehensive, realistic scenario with actionable prompts, encouraging detailed, role-relevant responses and promising follow-up."
+      }
+    }
+  },
+  {
+    "technique": "Zero-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "vague-behavioral-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, highly tailored, and actionable interviewer reply that models best practices and encourages improvement.",
+    "reply": "Thanks — that’s a start, but it’s too high-level for a behavioral interview. Interviewers want a concrete story with clear actions and outcomes. Let’s structure this using STAR so you can show judgment, communication, and impact (all key for a PM in B2B SaaS who owns prioritization and activation).\n\nUse these prompts to fill in a stronger answer:\n- Situation: Which stakeholder? (sales rep, VP of sales, key customer, CEO?) What did they ask for and why did it matter to them?\n- Task: What was your responsibility? What goal/metric (e.g., roadmap delivery, activation rate, time-to-value) were you protecting?\n- Action: How did you evaluate the request? What data/criteria did you use? How did you communicate the decision? What alternatives or compromises did you propose (workaround, phased approach, pilot, timeline)?\n- Result: What happened after? Include measurable outcomes if possible (activation %, deal closed, dev velocity preserved, stakeholder relationship maintained). What did you learn?\n\nExample answer (model you can adapt):\n- Situation: “A strategic account executive pushed for a bespoke integration for a large prospect that would unlock a potential $500K annual contract.”\n- Task: “I had to decide whether to prioritize a fast, one-off integration that would derail our Q2 roadmap or find another path that protected our activation and engineering velocity.”\n- Action: “I ran a quick impact assessment with engineering (est. 6 sprints) and product analytics (estimated <2% of current customers would use it). I met the AE, explained the tradeoffs, and proposed a compromise: offer a supported manual onboarding flow + an SLA-backed pilot for the prospect, while committing to evaluate a generalizable integration on our next roadmap cycle if pilot metrics justified it. I documented the decision and got buy-in from eng and the sales leader.”\n- Result: “The prospect accepted the pilot and converted. We avoided a six-sprint disruption, kept our activation roadmap on track, and later built a reusable integration after data showed demand from 5 similar accounts. The AE remained an advocate because they got a pragmatic solution and a clear timeline.”\n\nWould you like to try answering again with a specific story? I’ll give line-by-line feedback and help tighten it for interviews.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's vague answer and focuses on a key PM skill—prioritization and stakeholder management—relevant to the B2B SaaS PM role."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The interviewer sounds like a knowledgeable human coach, providing a realistic critique and practical advice on structuring behavioral answers with the STAR method."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically engages with the candidate's high-level answer by requesting concrete details and provides a detailed example tailored to the job context."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The interviewer offers clear, actionable guidance, a structured framework, and an example answer, then invites the candidate to try again with support, effectively moving the candidate forward."
+      }
+    }
+  },
+  {
+    "technique": "Zero-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "strong-technical-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional and comprehensive interviewer reply that thoroughly evaluates the candidate's answer, provides detailed, realistic feedback, and guides the candidate toward deeper understanding and practical implementation.",
+    "reply": "Solid approach — requiring an idempotency key, storing a request hash and response, unique constraint, and returning a stored response are exactly the right high-level building blocks. A few practical caveats and improvements I’d make for a production payments API:\n\nWhat you got right\n- Idempotency key + unique constraint is standard practice.\n- Storing request hash and comparing it to detect mismatched payloads (returning 409) is reasonable.\n- Expiring keys to avoid unbounded storage is necessary.\n\nGaps and risks, and how to address them\n1. Race conditions / “double spend” with external side effects\n- Problem: two concurrent requests with the same idempotency key might both try to call the payment provider unless you ensure only one worker actually executes the operation.\n- Fix: create the idempotency record before calling external systems and make the creator the owner of processing. Example flow:\n  1. Try INSERT INTO idempotency (client_id, key, request_hash, status='in_progress') RETURNING id.\n  2. If INSERT succeeded → you are the owner: call downstream provider, then UPDATE row with status='succeeded'/'failed', response payload, provider ids, timestamps.\n  3. If INSERT conflicts → SELECT existing row. If status='in_progress', wait/poll or return a 202 and let the client retry later; if status='succeeded' return stored success; if status='failed' you may allow retry depending on failure type.\n- Alternatives: use SELECT FOR UPDATE or application-level locks (Postgres advisory locks, Redis SETNX) to serialize processing, but inserting a record first is usually clearer.\n\n2. Handling transient failures vs permanent failures\n- You probably want different behavior for prior transient failures (allow retry) vs permanent ones (return 409 on different payload).\n- Store a status enum (pending/in_progress/succeeded/failed) and an error code for failures. Permit retries if previous attempt failed with transient network error.\n\n3. Scope idempotency keys by principal\n- Make the unique constraint include client/merchant/account id (unique on (client_id, idempotency_key)). Otherwise different customers could collide.\n\n4. Canonicalize and hash the payload consistently\n- Compare hashes of canonicalized JSON (sorted keys, normalized whitespace) so equivalent payloads don’t look different. If hashes differ, 409 is fine but you should return the previous request hash or a helpful error explaining difference.\n\n5. Storage shape and response serialization\n- Persist response status code, body, headers, any provider identifiers, and timestamps. That lets you reconstruct what to return to the client exactly.\n\n6. Expiry and cleanup\n- TTL: expire keys after a policy-driven window (24–72 hours typical for payments). Implement background cleanup (DELETE older rows) and consider partitioning by date to make deletion cheap.\n\n7. Performance at high throughput\n- Postgres is fine but can become a hotspot on a single table. Consider:\n  - Using a small, indexed hot table and offloading older rows.\n  - Caching idempotency records in Redis for a short period to reduce DB reads for repeat requests.\n  - If you use Kafka for async processing, include the idempotency key as the Kafka message key so consumers can deduplicate by key.\n\n8. Downstream provider idempotency\n- If the payment provider supports idempotency keys, forward your idempotency key to them. Save provider-side id to help audit and to help in reconciliation.\n\nConcrete implementation sketch\n- Table: idempotency(client_id, idempotency_key, request_hash, status, response_status, response_body, provider_id, created_at, updated_at), unique (client_id, idempotency_key).\n- Flow (simplified):\n  - Canonicalize request → compute request_hash.\n  - Try INSERT (client_id, key, request_hash, status='in_progress') ON CONFLICT DO NOTHING RETURNING *.\n  - If inserted: call provider, then UPDATE row with response and status.\n  - If conflict: SELECT row WHERE client_id/key. If status='in_progress' wait/poll or return 202; if status='succeeded' return stored response; if status='failed' decide whether to retry or return stored error.\n\nChoice of HTTP code for mismatched payloads\n- 409 Conflict is acceptable. Also include in response the stored request hash and optionally the stored payload or a message so clients can diagnose mismatches.\n\nNext step\n- Want a sample SQL schema and a concrete code snippet showing the insert/read/processing flow? Or would you prefer a scenario-based follow-up (concurrent requests or provider timeout) to walk through how your endpoint behaves?",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's idempotency approach in the context of a backend payments API, fitting the job requirements perfectly."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The feedback is detailed, technically accurate, and reflects a knowledgeable human interviewer providing nuanced critique and practical improvements."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages deeply with the candidate's answer, highlighting what was correct and identifying multiple concrete gaps with precise technical suggestions."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The interviewer offers actionable advice, outlines a concrete implementation sketch, and proposes clear next steps to advance the candidate's understanding."
+      }
+    }
+  },
+  {
+    "technique": "Zero-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "subtly-wrong-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional interviewer reply that is highly relevant, realistic, specific, and helpful, providing detailed feedback and a challenging follow-up to advance the candidate's understanding.",
+    "reply": "Good start — you’ve captured the basic idea, but the answer is incomplete and a bit too categorical. Quick, focused feedback and then a follow-up exercise.\n\nWhat’s right\n- Incremental loads do aim to process only new or changed data, so they’re often faster and cheaper than recomputing everything.\n\nWhat’s missing / incorrect\n- “Always faster and cheaper”: not always. If incremental logic is complex (handles updates/deletes, dedup, late arrivals), engineering cost and runtime overhead can outweigh benefits. For small tables a full-refresh can be simpler and cheaper.\n- “You never really need full refresh”: incorrect. Full refreshes are necessary sometimes (schema changes, bug fixes, backfills, reprocessing after a logic change, when the source lacks reliable change indicators, or when dedup/upsert logic is easier to implement by recomputing).\n- Late-arriving data isn’t always safely handled by “next run” unless you design for it (lookback windows, reprocessing affected partitions, CDC/merge semantics). Naively waiting can produce incorrect downstream aggregates or violate SLAs.\n\nWhen to pick each (practical rules)\n- Incremental (prefer when):\n  - Source provides reliable change markers (timestamps, changelog, CDC).\n  - Table is large and reprocessing is costly.\n  - You can implement idempotent upserts (MERGE) and/or maintain partitioned refreshes.\n  - You can tolerate some eventual consistency and handle late-arriving data via lookback windows or reprocessing partitions.\n- Full-refresh (prefer when):\n  - Table is small and full refresh is cheap and simpler.\n  - Source has no reliable keys/timestamps and changes are hard to detect.\n  - You need to fix data quality issues or implement a logic change that can’t be applied incrementally.\n  - After schema changes that invalidate incremental assumptions.\n\nPatterns and trade-offs (practicalities for your stack)\n- Use MERGE statements in Snowflake for upserts (insert/update/delete) if source provides primary key or natural key + last_modified.\n- Snowflake Streams + Tasks provide built-in CDC-like behavior; they simplify incremental handling for changes and deletes.\n- Use partitioned incremental or windowed refresh: process only recent partitions (e.g., last N days) instead of entire table.\n- For late-arriving data: choose a lookback window (e.g., reprocess last 1–7 days each run) or detect and reprocess affected partitions when late rows arrive.\n- Backfills: parameterize Airflow dags to reprocess specific partitions/dates; for large reprocesses use Snowflake zero-copy clones or transient warehouses to limit production impact.\n- Cost control: limit the scope of recomputations, schedule heavy jobs off-peak, right-size Snowflake warehouses, avoid unnecessary full-refreshes.\n- Data quality: add row-count checks, checksums, column-level tests, and monitoring/alerts to detect drift and late-arriving issues.\n\nShort example strategies\n- Source has update timestamps & deletes:\n  - Ingest delta to a staging table.\n  - Use MERGE into production table on key, using last_modified to choose updates.\n  - Use Snowflake Streams to capture and apply changes continuously.\n- Source has no timestamps & is append-only but large:\n  - Use deduping on natural keys and run incremental by comparing hashes.\n  - If impossible, do full-refresh for affected partitions or whole table depending on cost.\n\nFollow-up (practice question)\nDesign an incremental ingestion strategy for a source table that:\n- Is large (hundreds of millions of rows),\n- Contains inserts, updates, and occasional late-arriving rows,\n- Provides a last_modified timestamp but timestamps for late arrivals can be earlier than their arrival time,\nand you must implement this in Airflow + Snowflake, ensure data quality, and control compute cost. Outline the steps, how you’d handle late arrivals/backfills, and what monitoring you’d add.\n\nAnswer that and I’ll evaluate your approach.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's answer about incremental vs full-refresh loads, focusing on Airflow and Snowflake context relevant to the job posting."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The feedback is nuanced, realistic, and appropriately challenges the candidate's oversimplifications without being overly harsh or generic."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages deeply with the candidate's specific claims, correcting inaccuracies and adding detailed, concrete examples and trade-offs."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply provides actionable feedback, practical rules, and a detailed follow-up question that pushes the candidate to apply concepts in a realistic scenario."
+      }
+    }
+  },
+  {
+    "technique": "Zero-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "meta-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional and highly tailored reply that thoroughly equips the candidate with insightful, role-specific questions and practical interviewing strategy.",
+    "reply": "Good — here are 7 targeted questions you can use at the end of your onsite. I’ve grouped each by the angle it tests and added a one-line note on why it makes a strong impression. Tip: pick 3–4 to ask depending on who you’re speaking with (hiring manager, design lead, PM, engineering lead, or compliance partner).\n\n1) Can you walk me through a recent cross-functional project where design system decisions directly impacted product delivery — what were the biggest collaboration challenges and how were they resolved?\n- Why it impresses: Shows you think in concrete outcomes, care about real-world trade-offs, and want to understand how teams actually collaborate.\n\n2) What would success look like for the Senior UX Designer in the first 90 and 180 days — specifically around taking ownership of the design system and running user research?\n- Why it impresses: Signals you’re outcome-focused and want alignment on priorities and deliverables from day one.\n\n3) How is the design system tied into engineering workflows and component/version control? Can designers propose changes directly, and what’s the release/QA process like?\n- Why it impresses: Demonstrates technical fluency and a practical concern for maintainability and shipability.\n\n4) When regulatory or compliance changes require UI updates, how do product, compliance, and design coordinate — and what’s your process for fast, auditable changes?\n- Why it impresses: Shows you understand fintech constraints and are thinking proactively about risk, speed, and traceability.\n\n5) What’s your current research cadence and access to real users (or data)? Can you share an example where research materially changed the direction of a product or flow?\n- Why it impresses: Communicates commitment to evidence-driven design and helps you gauge how research influences decisions.\n\n6) As a scale-up, what are the biggest product or market risks you’re allocating design resources toward over the next 12 months?\n- Why it impresses: Positions you as a strategic hire who wants to align design effort with the company’s biggest priorities and risks.\n\n7) How do designers grow here — both technically (e.g., design systems, research skills) and in leadership/strategy? What does career progression look like for senior designers?\n- Why it impresses: Signals you care about long-term impact, mentorship, and whether the company will invest in you.\n\nIf you want, tell me which interviewers you’ll have on the onsite and I’ll recommend the best 3–4 questions to ask each person and what good answers sound like.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The questions directly relate to the Senior UX Designer role and the fintech scale-up context, addressing design systems, user research, compliance, and collaboration."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable human interviewer providing nuanced, role-specific advice and practical tips for tailoring questions to different interviewers."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The questions and explanations engage specifically with the candidate's request and the job posting details, avoiding generic filler."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply offers actionable, concrete questions with clear reasons why they impress, plus an offer to customize further based on the candidate's interview schedule."
+      }
+    }
+  },
+  {
+    "technique": "Few-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "opening-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, highly relevant, and detailed question that perfectly aligns with the job requirements and effectively probes the candidate's practical experience.",
+    "reply": "First question: Describe a specific project where you used SQL, dbt, and Looker to own reporting for a growth initiative or A/B test. Walk me through the end-to-end process: how you designed the metrics and data model (dbt), wrote the SQL, built the Looker dashboards, and how you presented the results to non-technical stakeholders. Include any challenges you faced and the outcomes.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly targets the key skills and responsibilities outlined in the job posting, focusing on SQL, dbt, Looker, and growth/A-B test reporting."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The question is realistic and appropriately challenging for a Data Analyst role, asking for a detailed, experience-based response without being overly technical or vague."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The question specifically engages with the candidate's experience using the exact tools and tasks mentioned in the job description, requesting concrete examples and process details."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The question encourages the candidate to demonstrate relevant skills and storytelling, which helps the interviewer assess both technical and communication abilities, moving the interview forward effectively."
+      }
+    }
+  },
+  {
+    "technique": "Few-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "vague-behavioral-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional interviewer reply that is highly relevant, realistic, specific, and helpful, providing the candidate with clear guidance and a strong example to improve their answer.",
+    "reply": "Weaknesses in your original answer\n- Vague and unstructured: “that happens a lot” and “I usually just explain” give no concrete situation, actions, or outcome.  \n- No evidence: saying “I’m pretty good at communication” is an unsupported claim.  \n- Misses role-relevant details: no mention of the product, stakeholder type (sales, exec, customer?), prioritization trade-offs, engineering/design involvement, or activation metrics— all important for this PM role.  \n- No result or lesson learned: we don’t know whether the decision led to a good outcome or how you changed your approach.\n\nOne small strength\n- You indicate this is a recurring situation and that communication is your tool—good to surface that frequency. But you need to back it up with specifics.\n\nImproved answer (STAR-style)\nSituation: At my last B2B SaaS role we were two weeks away from launching a revamped onboarding flow designed to improve activation for mid-market customers. The VP of Sales asked us to build a custom onboarding variant for a marquee prospect that required significant engineering time and risked delaying the launch.\n\nTask: As the PM responsible for activation metrics, my task was to decide whether to prioritize the one-off request or keep the launch timeline to hit our activation target.\n\nAction: I gathered data on how much engineering and design effort the custom work would need (about 3 sprints), and modeled the impact on our activation roadmap. I spoke with the VP to understand the business urgency and with the prospect to see if a temporary workaround was acceptable. I also consulted engineering and design to explore a smaller-scope MVP that could satisfy the prospect’s core needs without delaying the launch. Based on the data, I proposed a compromise: ship the standardized onboarding on schedule, implement a short-term manual onboarding runbook for the prospect, and commit to a scoped integration in the next sprint cycle. I documented the trade-offs and the expected impact on activation metrics and got alignment from the VP and engineering.\n\nResult: We shipped on time and hit our activation improvement target (time-to-first-value dropped by ~20% in the first month). The prospect was successfully onboarded using the manual process and converted to a customer; we later delivered the scoped integration in the next sprint without derailing other priorities. Afterward I formalized a “one-off” decision checklist so future requests were evaluated consistently.\n\nWhy this is strong\n- Specific situation, role, and stakeholders named.  \n- Clear actions: data collection, cross-functional alignment, alternative solution, and documentation.  \n- Concrete results and a lesson: measurable activation improvement and a process change to handle future requests.\n\nSTAR prompts to help you re-answer\n- Situation: What product or feature was involved? Who was the stakeholder and why was their ask important? What deadline or metric was at stake?  \n- Task: What was your responsibility or decision point? What outcome were you trying to protect or achieve?  \n- Action: What steps did you take? What data/metrics did you gather? Who did you involve (engineering, design, sales, customer)? What alternatives did you consider and why did you choose the one you did? How did you communicate the decision?  \n- Result: What happened? Give numbers if you can (activation %, time saved, revenue, timeline). What did you learn and how did you change your process?\n\nTry again using the STAR prompts above; give a concrete example and include one or two metrics.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's vague answer by highlighting missing role-relevant details and focusing on activation metrics, which are key for the PM role."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The feedback is realistic and typical of a competent interviewer, providing constructive criticism and a detailed improved example without undue praise."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically engages with the candidate's answer, pointing out exact vague phrases and missing elements, and offers a concrete STAR example tailored to the job posting."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply moves the candidate forward by giving clear, actionable advice, a structured improved answer, and STAR prompts to guide the candidate's revision."
+      }
+    }
+  },
+  {
+    "technique": "Few-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "strong-technical-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 4
+    },
+    "average": 4.75,
+    "verdict": "An excellent, detailed, and realistic feedback that thoroughly engages the candidate's answer and points out critical areas for improvement, though it could be slightly more actionable.",
+    "reply": "What you did well\n- You covered the common, practical approach: require an idempotency key, persist it with a unique constraint, return the stored response for repeats, and return 409 on a key+different-payload. That hits the core expectations for a payments endpoint and shows you understand the basic mechanics and the need for expiry.\n\nWhat could be stronger / missing details\n- Concurrency and races: “Writes go in one transaction; on conflict we read the existing row” is the right idea but omits how you avoid two concurrent requests both inserting/processing the payment (race between insert and processing).\n- In-progress state and partial failures: you didn’t describe how to handle when a request starts processing but the app crashes before persisting the response (so retries must not re-create charges).\n- Scope of key and hashing: idempotency keys must be scoped (merchant/account/operation) and the payload-hash needs a clear purpose (is it to detect intentional different payloads?).\n- Performance: at high throughput",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The feedback directly addresses the candidate's approach to making a payment-creation endpoint safe to retry, which is central to the backend engineer role described."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable interviewer providing balanced feedback, acknowledging strengths and pointing out realistic, nuanced concerns without undue praise."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The feedback engages specifically with the candidate's answer, referencing exact points like transaction handling, concurrency, key scoping, and performance."
+      },
+      "helpfulness": {
+        "score": 4,
+        "rationale": "The reply clearly identifies areas for improvement and missing details, but it could be improved by suggesting concrete next steps or questions to prompt the candidate to elaborate."
+      }
+    }
+  },
+  {
+    "technique": "Few-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "subtly-wrong-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional interviewer reply that thoroughly critiques the candidate's answer, provides a detailed improved response, and sets a challenging next question, perfectly aligned with the role and conversation.",
+    "reply": "Weak parts of your answer\n- Overgeneralizes: saying incremental is \"always faster and cheaper\" and that full refresh is \"never really needed\" is incorrect. Both have trade-offs and valid use cases.\n- Lacks specifics: doesn't explain how incremental loads detect changes (watermarks vs CDC), how they handle late-arriving or updated rows, nor when incremental logic fails.\n- Misses operational concerns important for this role: backfills, data quality checks, idempotency, and Snowflake/Airflow-specific patterns.\n\nWhy that matters for this role\n- As a Data Engineer for Airflow + Snowflake, you’ll need to reason about when to implement incremental logic vs when to do a full refresh to guarantee correctness while controlling compute costs and making backfills reliable.\n\nStrong improved answer (concise, specific)\n- Definition: Incremental loads apply only new or changed data since the last successful run (using a watermark column or CDC stream). Full-refresh reloads the entire target table from source.\n- When to pick incremental:\n  - Use it when source data volume is large and only a small fraction changes each run, when you have stable keys/timestamps, and when you can guarantee idempotent/mergeable transforms (e.g., MERGE into Snowflake).\n  - Benefits: lower compute, faster runs, lower cost—if implemented correctly.\n- When to pick full refresh:\n  - Use it if the dataset is small enough that reloading is cheap, if your incremental logic is unproven or complex (e.g., update-in-place without stable keys), after upstream corruption or schema changes, or when dedupe/business logic changes require re-computing every row.\n  - Also necessary when late-arriving rows or updates exceed your watermark window or when CDC isn’t available.\n- Practical considerations and trade-offs:\n  - Incremental complexity: requires robust watermark/CDC, idempotency, deduplication, and handling of late-arriving updates. If you can’t guarantee these, you risk silent data quality issues.\n  - Backfills: prefer partitioned partial backfills (date ranges) or replaying CDC/streams. For large or corrupted datasets, full refresh from a clean source may be safest.\n  - Snowflake specifics: use MERGE for incremental upserts, Streams+Tasks for CDC-style changes, Time Travel and zero-copy clone to test/backfill safely, and transient tables for staging. Control cost via right-sized warehouses, auto-suspend, and batching.\n  - Airflow operationally: make DAGs idempotent, expose manual backfill operators, and include sensors/quality checks to prevent bad incremental runs from progressing.\n- Short take-away: prefer incremental when feasible for cost and speed, but only after ensuring idempotency, correct change detection, and a clear plan for late-arriving data and backfills—otherwise do a full refresh.\n\nWhy this is stronger\n- It shows concrete methods (watermarks, CDC, MERGE, Streams), when full refresh is the safer option, and addresses backfills, data quality, and cost—key concerns in this job posting.\n\nFollow-up (next, more challenging question)\nDesign an incremental ingestion pipeline from an OLTP database into Snowflake using Airflow. Describe:\n- How you’d detect changes (watermark vs CDC) and why,\n- The Snowflake table strategy (staging, target, merge, Time Travel/clone use),\n- How Airflow DAGs handle normal runs, backfills, and reruns,\n- Data quality checks and how you’d block bad runs,\n- Cost-control measures for Snowflake compute.\nDiscuss trade-offs and one failure scenario and how you’d recover.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's answer and the job's key concerns, focusing on Airflow, Snowflake, data quality, backfills, and cost control."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The feedback is detailed, nuanced, and appropriately critical, reflecting how a knowledgeable human interviewer would correct misconceptions and deepen the candidate's understanding."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages specifically with the candidate's overgeneralizations and omissions, providing concrete examples and technical details relevant to the candidate's original points."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "It offers a clear, improved model answer, explains why it is stronger, and proposes a challenging, relevant follow-up question that pushes the candidate to apply and extend their knowledge."
+      }
+    }
+  },
+  {
+    "technique": "Few-Shot",
+    "model": "openai/gpt-5-mini",
+    "case": "meta-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional, highly tailored, and actionable reply that perfectly supports the candidate in preparing strong questions for their onsite interview.",
+    "reply": "Here are 7 tailored, high-impact questions you can ask at the end of an onsite for a Senior UX Designer role at a fintech scale-up (design-system ownership, user research, tight product & compliance collaboration). For each question I’ve added a one-line note on why it makes a strong impression.\n\n- How is ownership of the design system structured today, and what resources, processes, or KPIs are in place to maintain and drive adoption across product teams?\n  - Why it impresses: shows you think beyond pixels — about governance, scale, and measurable impact.\n\n- Can you walk me through a recent example where product, design, and compliance had conflicting priorities — how was the trade-off handled and who made the call?\n  - Why it impresses: demonstrates you expect and can navigate regulatory complexity and cross-functional decision-making.\n\n- What are the top usability or trust issues your users face right now, and what research or metrics informed the prioritization of those problems?\n  - Why it impresses: signals you care about evidence-driven work and want to tackle the most impactful user problems.\n\n- What level of access will I have to end users (retail or enterprise), and how is research time and budget typically allocated for discovery and validation?\n  - Why it impresses: shows practical focus on research ops and whether you’ll be able to do real, timely user research.\n\n- How will success be measured for this role in the first 6–12 months — what outcomes or milestones would you expect a senior designer to deliver?\n  - Why it impresses: communicates outcome-orientation and helps you confirm expectations up front.\n\n- How are design decisions documented and communicated (e.g., contribution process to the design system, design review cadence), and how do you balance design consistency with rapid product delivery?\n  - Why it impresses: highlights your concern for process, handoffs, and maintaining quality at speed.\n\n- Looking at the product roadmap and the regulatory landscape, where do you see the biggest product or design opportunities in the next 12–18 months?\n  - Why it impresses: positions you as strategic and aligned with company direction, not just tactical execution.\n\nIf you want, tell me which interviewers you’ll meet (PM, compliance lead, engineering manager, etc.) and I’ll suggest which 3–4 of these to prioritize and give follow-up questions tailored to each interviewer.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's question with highly relevant, role-specific questions tailored to the fintech scale-up Senior UX Designer position."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The response sounds like a knowledgeable human interviewer or coach, providing nuanced questions that reflect real-world challenges and expectations for the role."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "Each question is specifically crafted to the job posting details and includes explanations that engage with the candidate's intent to impress interviewers."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply offers actionable, concrete questions and even offers to tailor follow-ups based on the interviewers the candidate will meet, clearly moving the candidate forward."
+      }
+    }
+  },
+  {
+    "technique": "Chain-of-Thought",
+    "model": "openai/gpt-5-mini",
+    "case": "opening-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, highly relevant and detailed question that effectively probes the candidate's technical expertise and communication skills in a realistic interview context.",
+    "reply": "Tell me about a project where you owned reporting for a growth team end-to-end — specifically an A/B test readout. Walk me through:\n\n- the raw data sources and event/schema you used,\n- how you transformed and modeled the data (dbt models, key SQL logic, and any tests/QA you added),\n- the metrics and statistical approach you used to evaluate the experiment (how you defined cohorts, handled unit of analysis, p-values/confidence intervals, multiple comparisons, and any edge cases),\n- how you built the Looker dashboard and what visualizations/filters you included,\n- and how you presented the results to non-technical stakeholders (what you emphasized, how you explained uncertainty and recommendations).\n\nKeep your answer concrete — include example SQL snippets or dbt model structure where relevant. After your answer I’ll ask targeted follow-ups.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly targets the key skills and responsibilities outlined in the job posting, focusing on A/B test readouts, SQL, dbt, and Looker for a growth team."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The question is detailed and appropriately challenging, mirroring what a real interviewer would ask to assess both technical and communication skills."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The question explicitly references multiple technical aspects and presentation skills, requiring the candidate to provide concrete examples and details."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The question guides the candidate to provide a comprehensive, structured answer and signals that follow-ups will be based on their response, encouraging depth and clarity."
+      }
+    }
+  },
+  {
+    "technique": "Chain-of-Thought",
+    "model": "openai/gpt-5-mini",
+    "case": "vague-behavioral-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional interviewer reply that is highly relevant, realistic, specific, and helpful, providing clear guidance and a strong example to elevate the candidate's answer.",
+    "reply": "Your answer is too high-level for an interviewer — I can’t evaluate your judgment, influence, or impact without a concrete example. Please give a specific situation using the STAR structure. To help, answer these targeted prompts in order:\n\nSituation\n- Who was the stakeholder (role/team/customer)? \n- What did they ask for and why (feature, timeline, scope)?\n- What was the product context (roadmap, constraints, activation goal)?\n\nTask\n- What decision were you expected to make or what outcome were you accountable for?\n\nAction\n- How did you evaluate the request (data, user research, cost/benefit, prioritization framework)?\n- What alternatives did you propose?\n- How did you communicate the “no” (meeting, email, demo) and manage escalation or relationship risk?\n- How did you involve engineering/design/customer success?\n\nResult\n- What happened after — concrete outcomes (metrics, delivery dates, stakeholder reaction)?\n- What did you learn and what follow-up did you do to rebuild trust or track the issue?\n\nIf it helps, here’s a short model answer you can mirror:\n\nSituation: The VP of Sales asked me to build a custom reporting feature for two large prospects that promised immediate deals. Our team was in the middle of a sprint to deliver a new onboarding flow aimed at improving activation (time-to-value) for all customers.  \nTask: I had to decide whether to re-prioritize engineering to deliver the custom report quickly or protect the onboarding work that would move our activation metric.  \nAction: I pulled usage data and a customer request log, estimated engineering effort, and ran a quick RICE analysis. The custom report would take ~3 weeks of dev time and benefit 2 accounts; the onboarding work impacted 70% of new customers and was projected to reduce time-to-value by 15%. I proposed an alternative: a temporary CSV export workaround from Customer Success and a commitment to scope the custom report as a paid, sponsored professional services project or queue it for the next quarter’s roadmap. I explained the trade-offs in a one-on-one with the VP, showed the data and RICE score, and invited him to co-sponsor the expedited build if he could secure the deal as a pilot customer.  \nResult: The VP accepted the workaround; we closed both deals with the export in place, kept the onboarding sprint intact, and ultimately improved our activation metric by the projected 15% within the next month. The VP stayed engaged and later funded the custom report as a paid project, preserving the relationship.\n\nNow please give your specific STAR example answering the prompts above. If you don’t have exact numbers, focus on the decision process, alternatives you offered, and the outcome.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's vague answer by requesting a detailed STAR example relevant to the Product Manager role and the specific question."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable human interviewer providing clear, structured guidance and a realistic model answer to improve the candidate's response."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages precisely with the candidate's lack of detail and offers targeted prompts and a concrete example tailored to the candidate's initial answer."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply gives actionable, step-by-step instructions and a model answer that will help the candidate understand how to improve their answer effectively."
+      }
+    }
+  },
+  {
+    "technique": "Chain-of-Thought",
+    "model": "openai/gpt-5-mini",
+    "case": "strong-technical-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional interviewer reply that is highly relevant, realistic, specific, and helpful, providing detailed feedback and practical next steps tailored to the candidate's answer.",
+    "reply": "Good answer — you covered the core idea (client-provided idempotency key, unique constraint, store response, 409 on different payload, expiry). Below I’ll highlight strengths, gaps/edge cases, a safer implementation pattern, and a couple of follow-ups I’d ask in an interview.\n\nWhat you did well\n- Requires client idempotency key (correct).\n- Persist the key + request hash + response in Postgres with a uniqueness constraint (good durable source of truth).\n- Returning stored response for repeats is the expected behavior.\n- Returning 409 on conflicting payloads is a valid policy.\n- TTL/expiry for keys addresses storage growth.\n\nGaps and risks to address\n- Race conditions around “writes go in one transaction; on conflict we read the existing row” — you must ensure the initial insert that prevents double-processing happens before any expensive side-effect (charging). Two concurrent requests could both proceed to charge if you don’t reserve/claim the key atomically.\n- Where you mark the intent vs. final outcome: you need a status (e.g., pending/processing/succeeded/failed) to avoid partial/phantom results and to allow recovery.\n- If idempotency_key is globally unique you could unintentionally collide across users. Bind it to owner (user_id, account_id).\n- 24h expiry may be insufficient for payments (compliance/chargeback windows). Consider business requirements before deleting.\n- Storing full responses may have size, PII, or encryption concerns.\n- What happens if a stored row is “processing” and the service crashes? Need recovery/lease mechanisms.\n- You return 409 for different payloads — that’s reasonable, but you may want to allow semantically equivalent payloads (e.g., ordering of JSON keys) by comparing a canonical request fingerprint rather than raw body.\n\nSafer implementation pattern (high-level)\n1. Schema: idempotency table with (idempotency_key, owner_id, request_hash, status, response_json, created_at, updated_at, claimed_by, claim_expires_at). Unique index on (owner_id, idempotency_key).\n2. Claim-before-processing:\n   - Attempt an atomic INSERT of a new row with status='processing' (claimed_by = this instance id, claim_expires_at = now + short TTL).\n   - Use INSERT ... ON CONFLICT DO NOTHING RETURNING *.\n   - If INSERT succeeded: this instance is the single processor — do the external charge. On completion update status + response.\n   - If INSERT returned nothing (conflict), SELECT the row:\n     - If status='processing' and claim not expired: return stored response if present or tell client operation in progress (429 or 202).\n     - If status='processing' but claim expired: try to claim via UPDATE ... WHERE status='processing' AND claim_expires_at < now RETURNING * (atomic claim transfer).\n     - If status='succeeded' or 'failed': return stored response (or 409 if request_hash differs).\n3. Use a short claim_expires_at to handle crashes; background job to detect abandoned processing and either mark failed or allow new claim.\n4. To detect payload mismatch use a canonical request fingerprint (hash of normalized JSON + relevant headers) rather than raw body string.\n\nConcrete SQL patterns (sketch)\n- Insert attempt:\n  INSERT INTO idempotency (owner_id, idempotency_key, request_hash, status, claimed_by, claim_expires_at, created_at)\n  VALUES ($owner, $key, $hash, 'processing', $worker_id, now() + interval '30 seconds', now())\n  ON CONFLICT (owner_id, idempotency_key) DO NOTHING\n  RETURNING *;\n\n- If no row returned, query existing row:\n  SELECT * FROM idempotency WHERE owner_id=$owner AND idempotency_key=$key;\n\n- To steal expired claim:\n  UPDATE idempotency\n  SET claimed_by=$worker_id, claim_expires_at=now() + interval '30 seconds', updated_at=now()\n  WHERE owner_id=$owner AND idempotency_key=$key AND status='processing' AND claim_expires_at < now()\n  RETURNING *;\n\nNotes on alternatives\n- Redis can be used as a fast pre-check/lock (SETNX with TTL) for low-latency claims, then persist canonical state in Postgres. But Redis alone is not durable enough for final truth.\n- Advisory locks (Postgres pg_advisory_lock) are an option to ensure single processor per key while keeping logic in DB.\n- Serializable isolation is possible but risk of contention and complex retries — the claim pattern is simpler.\n\nOperational and compliance considerations\n- Retention: payments often require longer retention than 24h. Confirm business/regulatory window before expiry.\n- Security: encrypt or redact PII in stored requests/responses.\n- Observability: log events for claim success/failure, monitor stale processing rows.\n\nFollow-up interview questions I’d ask you\n1. Show a brief Python/psycopg2 (or SQLAlchemy) snippet that implements the insert-claim pattern, including how you handle the case where the claim exists but is processing. (This tests practical correctness.)\n2. How would you handle idempotency when payment processing is asynchronous and the external gateway sends a webhook callback later? Describe end-to-end flow and guarantees.\n3. If a malicious client reuses another user’s idempotency key, how would you prevent accidental cross-account effects?\n4. How would you garbage-collect old idempotency rows safely, given possible late-arriving callbacks?\n\nIf you want, reply with which follow-up you prefer and I’ll grade an implementation or walk through the async design.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's answer about idempotency in a payment-creation endpoint, which is central to the backend engineer role described."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable human interviewer providing detailed, nuanced feedback and follow-up questions, including pointing out subtle race conditions and operational concerns."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages deeply with the candidate's specific points, highlighting exact strengths and gaps, and even provides concrete SQL patterns and implementation details."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply moves the candidate forward by giving actionable feedback, suggesting safer implementation patterns, operational considerations, and clear follow-up questions to deepen understanding."
+      }
+    }
+  },
+  {
+    "technique": "Chain-of-Thought",
+    "model": "openai/gpt-5-mini",
+    "case": "subtly-wrong-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional, thorough, and highly constructive reply that clearly guides the candidate on how to improve their answer with relevant technical depth and operational context.",
+    "reply": "Good start — you correctly pointed out the main benefit of incremental loads (they’re typically faster and cheaper). Your answer misses several important caveats and trade-offs an interviewer will want to hear for a Data Engineer role focused on Airflow + Snowflake, data quality, backfills, and cost control.\n\nQuick evaluation\n- Right: incremental loads avoid reprocessing all rows and usually reduce compute and cost.\n- Too strong: “you never really need full refresh” is incorrect — there are many valid reasons to do full refreshes.\n- Missing: handling of updates/deletes/late-arriving data, correctness guarantees, implementation approaches, operational complexity, and Snowflake/Airflow-specific considerations.\n\nWhat a strong answer would include (concise bullet points)\n- Definitions\n  - Incremental: only process changed/new records since last successful run (based on watermark, CDC, change tables, hashes).\n  - Full-refresh: rebuild the target table from scratch (or replace partitions) by reprocessing all source data.\n- When incremental is appropriate\n  - Append-only sources or sources with reliable change metadata (timestamps, CDC).\n  - Large datasets where reprocessing full volume is costly.\n  - When you can guarantee idempotency and deduplication.\n- When a full refresh is appropriate (or necessary)\n  - Source lacks reliable change indicators or CDC.\n  - Schema changes that alter transformation logic or column semantics.\n  - Bug/backfill/corruption requiring rebuilding (e.g., discovered bad transformations).\n  - Complex late-arriving data that would make incremental logic fragile.\n  - Small datasets where full refresh is simpler and cheaper overall.\n- Trade-offs and risks of incremental\n  - Complexity: logic to detect changes, handle deletes, SCDs, dedupe, and idempotency.\n  - Risk of missing late-arriving or out-of-order events if watermark logic isn’t robust.\n  - Operational burden: more edge cases, more tests, more monitoring.\n- Implementation patterns\n  - Watermark-based incremental (max timestamp or ingestion id).\n  - CDC/log-based (Debezium, DB change streams).\n  - Hash-based detection (compare row hashes).\n  - Partition-level refresh (refresh only affected partitions rather than entire table).\n  - Use Snowflake features: micro-partitions, clustering keys, time travel/undrop to aid recoverability and backfills.\n- Cost considerations\n  - Incremental usually lowers compute, but if incremental logic requires scanning large source tables or creating many small merging operations, cost can rise.\n  - Periodic full refresh (or compact/merge jobs) can reduce fragmentation and long-term cost.\n- Operational practices\n  - Make jobs idempotent and safe to re-run.\n  - Robust alerting and data quality checks (row counts, checksums).\n  - Maintain easy backfill processes in Airflow (parameterized DAG runs, manual triggers).\n  - Document SLA on late-arriving data and retention windows (how far back incremental must handle).\n- Example trade-off: If a source has unreliable timestamps but is large, you might choose periodic partition-level full refreshes plus CDC where available, rather than purely incremental.\n\nSuggested follow-up interview question you could ask the candidate\n- “Design an incremental load strategy for a orders table where orders can be inserted, updated, and deleted, the source provides last_updated timestamp but it’s occasionally delayed by hours. Describe how you’d ensure correctness, how Airflow DAGs would handle backfills, and how you’d minimize Snowflake costs.”\n\nHow the candidate could improve their answer\n- Acknowledge correctness vs cost trade-offs and operational complexity.\n- Give concrete patterns and when each is preferable.\n- Mention backfills, idempotency, and monitoring practices relevant to production Airflow + Snowflake pipelines.\n\nShort verdict: candidate knows the basic benefit but needs to demonstrate understanding of edge cases, failure modes, implementation patterns, and operational practices.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's answer in the context of a Data Engineer role focused on Airflow and Snowflake, emphasizing data quality, backfills, and cost control."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The feedback is detailed, nuanced, and realistic, pointing out the candidate's overgeneralization and missing elements without being overly harsh or generic."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically engages with the candidate's claim that full refreshes are unnecessary and provides concrete examples and bullet points tailored to the job context."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply offers actionable advice, a comprehensive checklist of what a strong answer would include, and a suggested follow-up question to deepen the candidate's understanding."
+      }
+    }
+  },
+  {
+    "technique": "Chain-of-Thought",
+    "model": "openai/gpt-5-mini",
+    "case": "meta-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional reply that provides highly relevant, realistic, specific, and actionable guidance perfectly suited to the candidate’s needs.",
+    "reply": "Here are 7 focused, high-impact questions you can ask at the end of your onsite—each tailored to a senior UX role at a fintech scale-up with design system ownership, user research, and close work with product and compliance.\n\n1. Can you describe the current ownership model for the design system and what success would look like for the person owning it in the first 6–12 months?\n- Why it impresses: Signals you’re ready to take responsibility, want clear success metrics, and care about practical outcomes and handoff across teams.\n\n2. How do product, engineering, and compliance typically resolve trade-offs when regulatory requirements constrain a UX pattern? Can you share a recent example and the decision process used?\n- Why it impresses: Shows you anticipate real-world constraints, value cross-functional alignment, and want to learn how decisions are made in practice.\n\n3. What user research cadence, channels, and participant access do designers have today, and how receptive is the roadmap to changes driven by qualitative insights?\n- Why it impresses: Demonstrates you prioritize evidence-based design and are assessing whether research can meaningfully influence product direction.\n\n4. What technical constraints (stack, component libraries, backward compatibility) should a design-system owner expect to manage, and how do you coordinate releases with engineering?\n- Why it impresses: Tests integration realities and shows you think end-to-end about implementation, performance, and developer experience.\n\n5. Which KPIs or business metrics does leadership use to measure UX impact here, and how are those metrics tracked and shared with the design team?\n- Why it impresses: Signals you’re outcome-driven and want to align design work with business goals and measurable impact.\n\n6. How is the design team structured today, what are the most common career paths for senior designers, and what mentoring/hiring responsibilities would I take on?\n- Why it impresses: Shows interest in team health, growth, and the role’s influence on hiring/mentorship—important at a scaling company.\n\n7. With the company scaling and an evolving regulatory landscape, what are the biggest UX or design-debt risks you foresee, and what resources or prioritization authority exist to address them?\n- Why it impresses: Demonstrates strategic thinking about technical and product debt, regulatory impact, and resource alignment—key for a senior hire.\n\nIf you want, tell me one or two specifics you’ve already learned about the role or company from earlier interviews and I’ll refine these to be even more targeted.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The questions are directly tailored to the senior UX designer role at a fintech scale-up, addressing design system ownership, user research, and collaboration with product and compliance."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable human interviewer providing realistic, nuanced questions that reflect real challenges and priorities in the role."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "Each question is specific to the candidate’s role and the company context, with detailed explanations of why each question impresses."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply offers concrete, actionable questions that the candidate can use immediately, plus an offer to further tailor them based on the candidate’s prior knowledge."
+      }
+    }
+  },
+  {
+    "technique": "Role-Play Persona",
+    "model": "openai/gpt-5-mini",
+    "case": "opening-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, highly relevant, and detailed question that effectively probes the candidate's technical and communication skills for the Data Analyst role.",
+    "reply": "First question: walk me through, step-by-step, how you would produce an A/B test readout starting from raw event logs. Be specific about the SQL logic and dbt model structure you’d build, the key metrics and statistical tests you’d run, and how you’d surface the results in Looker for non‑technical stakeholders. Also explain how you’d handle common edge cases (missing data, users in multiple experiments, inconsistent tracking).",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly targets key skills (SQL, dbt, Looker) and responsibilities (A/B test readouts, presenting to non-technical stakeholders) from the job posting."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The question is realistic and appropriately challenging for a Data Analyst role, requiring detailed technical and communication skills without being overly vague or simplistic."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The question is highly specific, asking for step-by-step details, SQL logic, dbt model structure, metrics, statistical tests, and handling edge cases, all tailored to the candidate's role."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The question clearly guides the candidate to demonstrate relevant technical expertise and communication ability, providing a strong foundation for assessing their fit and identifying areas for feedback."
+      }
+    }
+  },
+  {
+    "technique": "Role-Play Persona",
+    "model": "openai/gpt-5-mini",
+    "case": "vague-behavioral-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, focused follow-up that pushes the candidate to provide a concrete, structured example, perfectly suited to the role and the conversation.",
+    "reply": "Okay—I need a concrete example. Using the STAR format, start with Situation and Task: what was the context, who was the stakeholder, what did they request, and what were you ultimately accountable for in that moment?",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly addresses the candidate's vague initial answer about saying no to stakeholders, which is highly relevant for a Product Manager role."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The interviewer realistically pushes for a structured, concrete example using the STAR method, which is a common and effective interview technique."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The follow-up specifically asks for details about the situation, task, stakeholder, request, and accountability, engaging precisely with the candidate's vague response."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The prompt guides the candidate to provide a detailed, structured answer that will better demonstrate their skills and experience, moving the interview forward effectively."
+      }
+    }
+  },
+  {
+    "technique": "Role-Play Persona",
+    "model": "openai/gpt-5-mini",
+    "case": "strong-technical-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, detailed follow-up question that is highly relevant, realistic, specific, and helpful, effectively challenging the candidate to elaborate on critical implementation details.",
+    "reply": "Okay — that’s the high-level. Walk me through the exact sequence of steps (including SQL statements/transactions and the external charge call) for the first request and for a concurrent retry. Specifically: when do you call the payment processor relative to the DB insert/upsert, what SQL do you run, and how do you avoid double-charging if the charge succeeds but the DB write fails (or vice versa)?",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly addresses the candidate's approach to idempotency in a payment-creation endpoint, which is central to the backend engineer role and the job posting."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The interviewer asks for detailed, practical steps including SQL and transaction handling, reflecting a realistic and technically deep follow-up question an experienced interviewer would ask."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The question explicitly references the candidate's previous answer and requests specifics about SQL statements, transaction order, and failure scenarios, showing engagement with the candidate's solution."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "By requesting detailed steps and edge case handling, the question pushes the candidate to clarify and deepen their explanation, helping them prepare for real interview scenarios."
+      }
+    }
+  },
+  {
+    "technique": "Role-Play Persona",
+    "model": "openai/gpt-5-mini",
+    "case": "subtly-wrong-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, highly relevant and realistic follow-up that challenges the candidate to provide concrete, detailed answers aligned with the job requirements.",
+    "reply": "You said incremental is always better — convince me. Describe a concrete incremental-load design that handles late-arriving records, updates and deletes, and provides idempotency and correctness when loading into Snowflake. Include what keys/columns you’d use, how Airflow DAGs/tasks would implement it, and what monitoring/alerting you’d put in place. Also say what failure modes would force you to do a full refresh.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly addresses the candidate's previous claim about incremental loads and asks for detailed, role-relevant design considerations involving Airflow and Snowflake."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The interviewer challenges the candidate's assertion and requests a realistic, technical explanation including failure modes, which is typical of a competent human interviewer."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically engages with the candidate's statement about incremental loads being always better and asks for concrete design details, keys, DAG implementation, and monitoring."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "By asking for detailed design and failure scenarios, the interviewer pushes the candidate to demonstrate depth and practical knowledge, clearly moving the interview forward."
+      }
+    }
+  },
+  {
+    "technique": "Role-Play Persona",
+    "model": "openai/gpt-5-mini",
+    "case": "meta-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional, highly relevant, and actionable reply that perfectly guides the candidate on asking insightful questions tailored to the role and company context.",
+    "reply": "Good — you should leave with smart, specific questions that show you understand the role and the trade-offs a fintech scale-up faces. Pick 3–4 to ask in person (don’t fire off the whole list). Here are 7 tailored ones, with why each makes a strong impression.\n\n1) \"How mature is your design system today, who owns it, and what gaps would you expect me to close in the first 6–12 months?\"  \n   - Signals you can own and evolve a system, and asks for concrete priorities rather than vague expectations.\n\n2) \"Give me a recent example where compliance or regulatory constraints changed a product decision — how did design, product and legal resolve trade-offs?\"  \n   - Shows you understand fintech constraints and want to know how cross-functional trade-offs are handled in practice.\n\n3) \"When product timelines are tight, how is user research prioritized and resourced? What autonomy will I have to run studies or pivot designs based on findings?\"  \n   - Demonstrates you care about evidence-driven design but understand the need for pragmatic research workflows.\n\n4) \"What metrics or business outcomes will this role be held accountable for in the first year (e.g., conversion, support reductions, task success)? How do you track UX impact?\"  \n   - Positions you as outcome-oriented and forces the interviewer to name expectations and measurement approaches.\n\n5) \"Where do you see the biggest UX debt or customer friction on the platform today, and why hasn’t it been solved yet?\"  \n   - Shows you think in terms of impact and constraints (resourcing, tech debt, governance), not just aesthetics.\n\n6) \"How do design, product and engineering collaborate day-to-day — rituals, handoffs, tooling — and where do you experience the most friction?\"  \n   - Practical question that reveals ways of working and potential blockers you’d need to manage.\n\n7) \"What growth path do you expect for a Senior UX Designer here — ownership of the design system, mentoring responsibilities, or stepping toward design leadership?\"  \n   - Indicates you’re thinking about progression and long-term value, not just the immediate role.\n\nQuick tip: at an onsite, open with 1–2 questions about the team and ways of working (3,6), then ask 1–2 about impact/priorities (1,4 or 5), and finish with a growth question (7). If you tell me which interviewers you’ll meet, I’ll help you pick the best 3–4 to ask each person.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's question with tailored, role-specific questions relevant to a Senior UX Designer at a fintech scale-up."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The response sounds like a knowledgeable human interviewer providing practical, nuanced advice and does not blindly praise the candidate."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages specifically with the job posting details and offers concrete example questions with explanations tied to the fintech context and UX design responsibilities."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The answer moves the candidate forward by giving actionable, prioritized questions and a strategic tip on how to approach the onsite interview."
+      }
+    }
+  },
+  {
+    "technique": "Structured Evaluation",
+    "model": "openai/gpt-5-mini",
+    "case": "opening-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An excellent, targeted question that aligns perfectly with the job requirements and effectively probes the candidate's relevant skills.",
+    "reply": "First question: The growth team ran an A/B test to increase trial-to-paid conversion. Walk me through how you'd design the A/B test readout—what metrics you'd compute, how you'd implement them in SQL/dbt (briefly), and how you'd present results and uncertainties to non-technical stakeholders.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The question directly addresses the candidate's ability to design A/B test readouts, a key responsibility mentioned in the job posting."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The question is realistic and appropriately challenging for a Data Analyst role, requiring technical and communication skills without being overly complex."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The question is specific to the candidate's task, referencing SQL/dbt implementation and communication to non-technical stakeholders, aligning with the job description."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The question guides the candidate to demonstrate relevant skills and thinking, providing a clear framework to showcase technical and presentation abilities."
+      }
+    }
+  },
+  {
+    "technique": "Structured Evaluation",
+    "model": "openai/gpt-5-mini",
+    "case": "vague-behavioral-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 4,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 4.75,
+    "verdict": "An excellent interviewer reply that provides precise, actionable feedback and a strong example, effectively moving the candidate forward in the interview.",
+    "reply": "**Score:** 3  \n**What worked:**  \n- Acknowledges this is a common situation.  \n- Emphasizes communication skills.  \n- Confident tone.\n\n**What to improve:**  \n- No concrete example or context (who the stakeholder was, what was requested).  \n- Lacks STAR structure and specific actions taken.  \n- No outcome or metrics to show impact.\n\n**Stronger version:**  \nAt one point our VP of Sales pushed for a custom onboarding flow to close a strategic deal; I had to protect our roadmap and activation goals. I reviewed customer data and activation metrics, presented trade-offs to the VP, and proposed a phased approach: build a configurable onboarding template as an MVP and pilot it with that account. The stakeholder agreed, we closed the deal after the pilot, shipped the template in six weeks, and saw a 12% lift in activation for new customers.\n\n**Next question:**  \nUsing the STAR structure, tell me about a specific time you prioritized conflicting roadmap requests from sales and engineering—what did you decide, what actions did you take, and what was the result (include metrics if possible)?",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's vague answer about saying no to stakeholders and aligns well with the Product Manager role and the conversation context."
+      },
+      "realism": {
+        "score": 4,
+        "rationale": "The feedback is realistic and typical of a competent interviewer, providing constructive criticism and a strong example, though it could be slightly more conversational."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically critiques the candidate's lack of example and STAR structure, and offers a detailed, role-relevant stronger example."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The response clearly guides the candidate on how to improve their answer and follows up with a targeted next question to advance the interview."
+      }
+    }
+  },
+  {
+    "technique": "Structured Evaluation",
+    "model": "openai/gpt-5-mini",
+    "case": "strong-technical-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 4,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 4.75,
+    "verdict": "An excellent, detailed, and constructive reply that thoroughly critiques the candidate's answer and pushes them to think about concurrency and system design, though the unexplained 'Score: 7' could be removed for clarity.",
+    "reply": "**Score:** 7\n\n**What worked:**\n- Required an idempotency key and enforced uniqueness in Postgres.\n- Stored request hash and response and returned stored response on repeats.\n- Thought about expiry and conflict handling (409 on differing payload).\n\n**What to improve:**\n- Address concurrent/in‑flight requests (race conditions) and how to prevent double-processing.\n- Clarify idempotency scope (user/account/endpoint) and what exactly is stored (status, body, headers).\n- Consider faster checks/locking (Redis) and reliable side‑effect delivery (outbox → Kafka) for external payment calls.\n\n**Stronger version:** \nRequire a client idempotency key (scoped by account and endpoint), and insert an idempotency record in Postgres with a unique constraint using INSERT ... RETURNING; on conflict SELECT the existing row and compare request hashes — if they match return the stored status/body, if they differ return 409. Mark the record state (processing/succeeded/failed) and persist response metadata (HTTP status, headers, body); use a short Redis lock or advisory lock to avoid duplicate workers racing, and publish side effects via an outbox → Kafka so external calls are retried reliably. TTL/retention for keys should follow business windows (chargeback/reconciliation).\n\n**Next question:** How would you handle two concurrent requests that present the same idempotency key at the same time to ensure exactly one payment is created — describe the DB/lock flow and what each request should return.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's answer about idempotency in a payment-creation endpoint, fitting the backend engineer role focused on reliability."
+      },
+      "realism": {
+        "score": 4,
+        "rationale": "The feedback is detailed and technically sound, reflecting a knowledgeable interviewer; however, the initial 'Score: 7' is confusing and unrealistic in a 1-5 scale context."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply engages deeply with the candidate's points, highlighting specific strengths and weaknesses, and suggesting concrete improvements tied to the candidate's approach."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The reply provides actionable advice, a stronger version of the solution, and a clear, challenging follow-up question to advance the candidate's thinking."
+      }
+    }
+  },
+  {
+    "technique": "Structured Evaluation",
+    "model": "openai/gpt-5-mini",
+    "case": "subtly-wrong-answer",
+    "scores": {
+      "relevance": 5,
+      "realism": 4,
+      "specificity": 5,
+      "helpfulness": 4
+    },
+    "average": 4.5,
+    "verdict": "A strong, detailed interviewer reply that critiques the candidate's answer thoughtfully and advances the conversation with a relevant, specific follow-up question.",
+    "reply": "**Score:** 4/10\n\n**What worked:**\n- Correctly noted that incremental loads are typically faster and cheaper.\n- Recognized late-arriving data is a consideration.\n- Distinguished between incremental and full-refresh at a high level.\n\n**What to improve:**\n- Avoid absolutist claims — full refreshes are sometimes necessary (schema changes, corruption, complex corrections).\n- Missing handling for updates/deletes, idempotency, CDC, and deduplication requirements for incrementals.\n- Didn’t mention backfill strategies, failure recovery, or trade-offs in Snowflake/Airflow (cost vs complexity).\n\n**Stronger version:**  \nIncremental loads ingest only new or changed records (via watermarks or CDC), which reduces runtime and storage costs but require reliable change detection, idempotent upserts, and handling of updates/deletes and late-arriving data. Full-refresh replaces the target table and is more robust for schema changes, data corruption, or complex reprocessing, but is more expensive and slower. Choose incremental when the source provides stable keys/timestamps or CDC and you can implement safe upserts and monitoring; use full-refresh for small tables, after major schema or model changes, or when you need a simple recovery path.\n\n**Next question:**  \nHow would you design an Airflow + Snowflake incremental pipeline that handles late-arriving records and supports efficient backfills while controlling cost? Describe the main components and the approach for change detection, idempotency, and backfill execution.",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The reply directly addresses the candidate's explanation of incremental vs full-refresh loads, which is central to the data engineering role described."
+      },
+      "realism": {
+        "score": 4,
+        "rationale": "The feedback is detailed and realistic, pointing out common pitfalls and nuances a competent interviewer would notice, though it could be slightly more conversational."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The reply specifically engages with the candidate's answer, highlighting missing considerations like updates/deletes, idempotency, and backfill strategies."
+      },
+      "helpfulness": {
+        "score": 4,
+        "rationale": "The reply provides concrete advice on what to improve and follows up with a clear, challenging next question that pushes the candidate to demonstrate deeper knowledge."
+      }
+    }
+  },
+  {
+    "technique": "Structured Evaluation",
+    "model": "openai/gpt-5-mini",
+    "case": "meta-question",
+    "scores": {
+      "relevance": 5,
+      "realism": 5,
+      "specificity": 5,
+      "helpfulness": 5
+    },
+    "average": 5.0,
+    "verdict": "An exceptional, highly tailored, and actionable reply that thoroughly prepares the candidate to ask insightful questions aligned with the role and company context.",
+    "reply": "Here are 7 tailored, thoughtful questions to ask at the end of your onsite for a Senior UX Designer at a fintech scale-up, each with a brief note on why it makes a strong impression:\n\n1) How is the design system currently structured, who owns it, and what governance process do you use for changes?  \n- Shows you care about maintainability, cross-team standards, and taking ownership.\n\n2) How do you balance product velocity with compliance and regulatory requirements during design and delivery?  \n- Signals you understand fintech constraints and can design processes that align UX with legal/risk needs.\n\n3) Can you give an example of a recent user research finding that changed product direction — how was that insight surfaced and acted on?  \n- Demonstrates interest in research impact and whether the org truly uses evidence to make decisions.\n\n4) What are the most important outcomes you’d expect from this role in the first 3, 6, and 12 months?  \n- Reveals alignment on priorities and shows you’re results-oriented and ready to plan impact.\n\n5) Where do you currently see the biggest UX debt or usability risk in the product, and what would success look like in addressing it?  \n- Positions you as someone eager to tackle high-impact problems and understand trade-offs.\n\n6) How do product, engineering, and compliance typically collaborate on ambiguous or high-risk features — what decision-making rituals or escalation paths exist?  \n- Probes team dynamics and your ability to navigate cross-functional constraints.\n\n7) How do you measure the success of UX and the design system here (qualitative and quantitative metrics), and how are those tied to business metrics?  \n- Shows you focus on outcomes and can link design work to company goals.\n\nIf you’d like, I can help you pick 3–4 to prioritize based on the specific interviewers you’ll meet (e.g., hiring manager, head of compliance, product lead). Which roles will you be speaking with?",
+    "rubric": {
+      "relevance": {
+        "score": 5,
+        "rationale": "The questions are highly relevant to the Senior UX Designer fintech role, addressing design systems, compliance, user research, and cross-functional collaboration."
+      },
+      "realism": {
+        "score": 5,
+        "rationale": "The reply sounds like a knowledgeable human interviewer or coach providing realistic, nuanced questions that reflect real concerns in fintech UX design."
+      },
+      "specificity": {
+        "score": 5,
+        "rationale": "The response directly engages with the candidate's question by providing tailored questions with explanations, avoiding generic advice."
+      },
+      "helpfulness": {
+        "score": 5,
+        "rationale": "The detailed questions and rationale clearly help the candidate prepare thoughtful inquiries, and the offer to help prioritize based on interviewers adds actionable value."
+      }
+    }
+  }
+]

@@ -1,0 +1,7 @@
+streamlit>=1.58.0
+openai>=2.8.0
+python-dotenv>=1.2.0
+requests>=2.31.0
+pypdf>=6.0.0
+openpyxl>=3.1.0   # jailbreak_experiment.py Excel report
+pytest>=8.0.0     # test suite (tests/)

@@ -1,0 +1,17 @@
+[server]
+# Cap uploads (resume files) at 20 MB.
+maxUploadSize = 20
+# Rerun automatically when a source file changes.
+runOnSave = true
+
+[client]
+# Hide developer menu items and their keyboard shortcuts ("C" opens the
+# clear-cache dialog and hijacks Cmd+C on macOS).
+toolbarMode = "minimal"
+
+# Visual theme: calm indigo primary on a warm near-white background.
+[theme]
+primaryColor = "#4F6AF0"
+backgroundColor = "#FBFBFA"
+secondaryBackgroundColor = "#F1F3F9"
+textColor = "#20242E"
